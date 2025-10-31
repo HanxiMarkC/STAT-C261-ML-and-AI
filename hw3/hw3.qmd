@@ -1,5 +1,5 @@
 ---
-title: "BIOSTAT C161 HW2"
+title: "BIOSTAT C161 HW3"
 author: "Hanxi Chen"
 subtitle: :)
 date: today
@@ -37,168 +37,256 @@ library(dplyr)
 library(caret)
 ```
 
-## Q2
-This problem uses the Weekly.csv dataset (uploaded on Bruinlearn) containing 1089 weekly stock
-returns for 21 years
-### (a)
-Use the full dataset to fit a logistic regression of today’s stock movement (up or down) on
-the five lags of returns and the trading volume.
-
-**Sol:**
-```{r}
-# setwd('D:/R/BIOSTAT M236/BIOSTAT_M236_longitudinal/hw2')
-
-Weekly <- read.csv("./Weekly.csv")
-head(Weekly)
-```
-
-```{r}
-Weekly$Direction <- as.factor(Weekly$Direction)
-
-model_full <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume,
-                  data = Weekly,
-                  family = binomial)
-
-summary(model_full)
-```
-### (b)
-Calculate the confusion matrix, accuracy, precision, recall, and F1 score for the in-sample
-predictions. Does the model uniformly beat random guessing in terms of these performance
-metrics?
-
-**Sol:**
-```{r}
-prob_pred <- predict(model_full, type = "response")
-
-pred_class <- ifelse(prob_pred > 0.5, "Up", "Down")
-pred_class <- factor(pred_class, levels = levels(Weekly$Direction))
-
-# Confusion matrix
-conf_mat <- confusionMatrix(pred_class, Weekly$Direction)
-conf_mat
-
-```
-
-```{r}
-table_pred <- table(Predicted = pred_class, Actual = Weekly$Direction)
-table_pred
-
-# Extract metrics manually
-TP <- table_pred["Up", "Up"]
-TN <- table_pred["Down", "Down"]
-FP <- table_pred["Up", "Down"]
-FN <- table_pred["Down", "Up"]
-
-accuracy  <- (TP + TN) / sum(table_pred)
-precision <- TP / (TP + FP)
-recall    <- TP / (TP + FN)
-F1        <- 2 * precision * recall / (precision + recall)
-
-# Print metrics
-cat("Accuracy:", round(accuracy, 3), "\n")
-cat("Precision:", round(precision, 3), "\n")
-cat("Recall:", round(recall, 3), "\n")
-cat("F1 Score:", round(F1, 3), "\n")
-```
-
-For random guessing with an equal number of “Up” and “Down” observations, the expected accuracy, precision, recall, and F1 score are all 0.5. In comparison, the fitted logistic regression model yields an accuracy of 0.561, precision of 0.564, recall of 0.921, and F1 score of 0.700. Although the model slightly outperforms random guessing across all metrics, the improvement is modest and largely driven by its strong tendency to predict “Up,” which inflates recall. Therefore, while the model performs better than random guessing numerically, it does not provide substantial predictive power in practice.
-
-
-### (c)
-On the same graph, plot precision and recall against the threshold (varying over [0, 1] ) used
-to generate predicted labels from predicted probabilities. Explain the pattern you see
+## Q1
+### (iii)
+Plot the function f over x ∈ [−2.5, 2.5]. How many local/global minima do you see? What
+are their approximate values? Can there be other local minima?
 
 **Sol:**
 
 ```{r}
-thresholds <- seq(0, 1, by = 0.01)
+# Clear environment
+rm(list = ls())
 
-precision_vals <- numeric(length(thresholds))
-recall_vals <- numeric(length(thresholds))
 
-for (i in seq_along(thresholds)) {
-  t <- thresholds[i]
-  pred_t <- ifelse(prob_pred > t, "Up", "Down")
-  pred_t <- factor(pred_t, levels = levels(Weekly$Direction))
-  cm <- table(Predicted = pred_t, Actual = Weekly$Direction)
-  
-  # Extract TP, FP, FN
-  TP <- cm["Up", "Up"]
-  FP <- cm["Up", "Down"]
-  FN <- cm["Down", "Up"]
-  
-  precision_vals[i] <- TP / (TP + FP)
-  recall_vals[i] <- TP / (TP + FN)
+f <- function(x) {
+  x^4 - 6*x^2 + 4*x + 18
 }
 
-pr_df <- data.frame(threshold = thresholds,
-                    Precision = precision_vals,
-                    Recall = recall_vals)
+x_vals <- seq(-2.5, 2.5, by = 0.01)
+y_vals <- f(x_vals)
 
-ggplot(pr_df, aes(x = threshold)) +
-  geom_line(aes(y = Precision, color = "Precision")) +
-  geom_line(aes(y = Recall, color = "Recall")) +
-  labs(title = "Precision and Recall vs Threshold",
-       x = "Classification Threshold",
-       y = "Metric Value") +
-  theme_minimal()
+plot(x_vals, y_vals, type = "l", col = "blue", lwd = 2,
+     main = expression(f(x) == x^4 - 6*x^2 + 4*x + 18),
+     xlab = "x", ylab = "f(x)")
+
+grid()
+f_prime <- function(x) 4*x^3 - 12*x + 4
+roots <- uniroot.all <- function(f, interval, n = 1000, ...) {
+  xseq <- seq(interval[1], interval[2], len = n)
+  yseq <- f(xseq)
+  sign_change <- which(diff(sign(yseq)) != 0)
+  sapply(sign_change, function(i)
+    uniroot(f, c(xseq[i], xseq[i + 1]), ...)$root)
+}
+
+critical_points <- uniroot.all(f_prime, c(-2.5, 2.5))
+critical_points
+
+points(critical_points, f(critical_points), col = "red", pch = 19)
+text(critical_points, f(critical_points) + 2, 
+     labels = round(critical_points, 2), col = "red")
+
+data.frame(
+  x = critical_points,
+  f_x = f(critical_points)
+)
 
 ```
 
-In this plot, precision and recall exhibit opposite trends as the classification threshold changes. When the threshold is low, almost all observations are predicted as “Up,” so recall remains close to 1 while precision stays around 0.5 because many “Down” cases are incorrectly labeled as “Up.” As the threshold increases, fewer observations are classified as “Up,” causing recall to drop sharply while precision gradually rises, reflecting fewer false positives. The fluctuations in precision at higher thresholds occur because very few positive predictions are made, so small changes in predictions can cause large variations in precision. Overall, the pattern illustrates the fundamental trade-off between precision and recall in binary classification.
+The plot of the function over the interval [−2.5, 2.5] shows three stationary points at approximately x = −1.88, 0.35, and 1.53. Based on their function values f(−1.88) ≈ 1.77, f(0.35) ≈ 18.68, and f(1.53) ≈ 15.55, the points at x = −1.88 and x = 1.53 are local minima, while x = 0.35 is a local maximum. The global minimum occurs at x ≈ −1.88 because it gives the smallest f(x). There cannot be any additional local minima since the derivative 4x^3 − 12x + 4 is cubic and thus has at most three real roots.
 
 
-### (d)
-Now fit the logistic regression using only data up to (and including) the year 2008, with
-Lag2 as the only predictor.
+
+
+### (iv)
+Write your own code for S steps of GD on this function (do not use built-in or third-party
+GD codes).
 
 **Sol:**
 ```{r}
-train_data <- subset(Weekly, Year <= 2008)
+# Gradient Descent
+gradient_descent <- function(x0, alpha, S) {
+  x_vals <- numeric(S + 1)  # store all iterates
+  x_vals[1] <- x0           # initial value
+  grad_vals <- numeric(S + 1)  # store gradients
+  
+  for (s in 1:S) {
+    grad <- f_prime(x_vals[s])
+    grad_vals[s] <- grad
+    x_vals[s + 1] <- x_vals[s] - alpha * grad
+  }
+  
+  grad_vals[S + 1] <- f_prime(x_vals[S + 1])  # gradient at last step
+  
 
-model_lag2 <- glm(Direction ~ Lag2, data = train_data, family = binomial)
+  return(data.frame(Step = 0:S,
+                    x = x_vals,
+                    f_x = f(x_vals),
+                    gradient = grad_vals))
+}
 
-summary(model_lag2)
 ```
 
-### (e)
-Repeat (b) using the remaining observations as a test sample.
+
+
+
+### (v)
+Repeat (i) and (ii) using your code with S = 20 steps. Do you observe convergence in both
+cases?
 
 **Sol:**
 ```{r}
-test_data <- subset(Weekly, Year > 2008)
+# Case 1: Start from x(0) = 1
+result_1 <- gradient_descent(x0 = 1, alpha = 0.1, S = 20)
+print(result_1)
 
-prob_test <- predict(model_lag2, newdata = test_data, type = "response")
+# Case 2: Start from x(0) = 0
+result_2 <- gradient_descent(x0 = 0, alpha = 0.1, S = 20)
+print(result_2)
 
-pred_test <- ifelse(prob_test > 0.5, "Up", "Down")
+# Plot convergence paths
+plot(result_1$Step, result_1$x, type = "l", col = "blue", lwd = 2,
+     ylim = range(c(result_1$x, result_2$x)),
+     main = "Convergence Paths of Gradient Descent (α = 0.1, S = 20)",
+     xlab = "Step", ylab = "x")
+lines(result_2$Step, result_2$x, col = "red", lwd = 2)
+legend("topright", legend = c("x(0)=1", "x(0)=0"), col = c("blue", "red"), lwd = 2)
 
-table(Predicted = pred_test, Actual = test_data$Direction)
-
-accuracy <- mean(pred_test == test_data$Direction)
-
-precision <- sum(pred_test == "Up" & test_data$Direction == "Up") /
-             sum(pred_test == "Up")
-
-recall <- sum(pred_test == "Up" & test_data$Direction == "Up") /
-          sum(test_data$Direction == "Up")
-
-f1 <- 2 * precision * recall / (precision + recall)
-
-cat("Accuracy:", round(accuracy, 3), "\n")
-cat("Precision:", round(precision, 3), "\n")
-cat("Recall:", round(recall, 3), "\n")
-cat("F1 Score:", round(f1, 3), "\n")
 ```
 
-The model trained using data up to 2008 and tested on later years achieves an accuracy of 0.625, meaning it correctly predicts about 62.5% of weekly market directions. Its precision of 0.622 indicates that when the model predicts “Up,” it is correct about 62% of the time, while the high recall of 0.918 shows that it successfully identifies around 92% of all actual “Up” weeks. The F1 score of 0.742, which balances precision and recall, suggests overall good predictive consistency. Compared to random guessing (which would yield about 0.5 for accuracy, precision, recall, and F1), this model performs notably better, particularly in recall. However, the model tends to overpredict “Up” movements, which explains its high recall but moderate precision.
+The plot shows the convergence behavior of gradient descent with α = 0.1 and S = 20 for two different initial points. When starting from x(0) = 1 (blue line), the algorithm quickly stabilizes near x ≈ 1.53, and the final gradient value of 0.000144 indicates that it has effectively converged to a local minimum. In contrast, when starting from x(0) = 0 (red line), the sequence oscillates strongly between negative and positive values, showing that the updates overshoot due to a large learning rate. The final gradient of −21.396 further confirms divergence rather than convergence. Therefore, gradient descent converges successfully only for the initial value x(0) = 1, while it fails to converge when starting from x(0) = 0 under the same learning rate.
 
 
-### (f)
-Which of the two fitted models would you use for real-time stock return prediction?
+
+
+### (vi)
+Now set the learning rate to α = 0.01 and repeat (v). Explain why GD performs differently
+from (v)
 
 **Sol:**
-For real-time stock return prediction, the model trained only on data up to 2008 (the Lag2 model) would be preferred over the model trained on the full dataset. The reason is that this model simulates a true forecasting scenario—using only past information to predict future outcomes—making its performance on post-2008 data a more realistic measure of predictive ability. Although its accuracy (0.625) is modest, it outperforms random guessing and demonstrates generalization beyond the training sample. In contrast, the full-sample model evaluates in-sample performance and thus may suffer from overfitting, offering an overly optimistic view of its predictive power in real-world applications.
+```{r}
+# Case 1: Starting from x(0) = 1
+result_x1_small_alpha <- gradient_descent(x0 = 1, alpha = 0.01, S = 20)
+print(result_x1_small_alpha)
+
+# Case 2: Starting from x(0) = 0
+result_x0_small_alpha <- gradient_descent(x0 = 0, alpha = 0.01, S = 20)
+print(result_x0_small_alpha)
+
+plot(result_x1_small_alpha$Step, result_x1_small_alpha$x, 
+     type = "b", col = "blue", pch = 19,
+     ylim = range(c(result_x1_small_alpha$x, result_x0_small_alpha$x)),
+     main = "Convergence Paths of Gradient Descent (α = 0.01, S = 20)",
+     xlab = "Step", ylab = "x")
+lines(result_x0_small_alpha$Step, result_x0_small_alpha$x, 
+      type = "b", col = "red", pch = 17)
+legend("bottomright", legend = c("x(0)=1", "x(0)=0"), 
+       col = c("blue", "red"), pch = c(19, 17))
+
+```
+
+With a smaller learning rate (α = 0.01), the updates become smoother and more stable. The path starting from x(0) = 1 moves slowly toward the local minimum near x ≈ 1.53, while the path from x(0) = 0 moves gradually toward the global minimum near x ≈ −1.88. However, after 20 steps, neither starting point has reached a point where the gradient is close to 0, indicating that convergence is not yet achieved due to the slower update rate.
 
 
+
+
+## Q2
+The College.csv dataset contains admissions data for a sample of 777 universities. We want to
+predict the number of applications received (“Apps”) using the other variables in the dataset
+
+### (i)
+Let the first 600 observations be the training set and the remaining 177 observations be the
+test set
+
+
+**Sol:**
+```{r}
+college <- read.csv("./College.csv")
+
+head(college)
+college <- college[, -1] 
+college$Private <- as.factor(college$Private)
+train <- college[1:600, ]
+test <- college[601:777, ]
+
+dim(train)
+dim(test)
+
+train_x <- model.matrix(Apps ~ ., data = train)[, -1]  # remove intercept
+test_x <- model.matrix(Apps ~ ., data = test)[, -1]
+train_y <- train$Apps
+test_y <- test$Apps
+```
+
+
+
+### (ii)
+fit the OLS regression on the training set, and report the test error obtained.
+For the rest of the problem, let the penalization parameter λ vary on the 1000-point grid
+from 0.01 to 60 .
+
+**Sol:**
+```{r}
+library(glmnet)
+
+# Fit OLS model (lambda = 0 no regularization)
+ols_fit <- lm(Apps ~ ., data = train)
+
+ols_pred <- predict(ols_fit, newdata = test)
+
+ols_mse <- mean((ols_pred - test_y)^2)
+ols_mse
+sqrt(ols_mse)
+lambda_grid <- seq(0.01, 60, length = 1000)
+```
+
+The test MSE = 1502077, RMSE is 1225.593.
+
+
+
+### (iii)
+Fit the LASSO regression on the training set, with the penalization parameter chosen by
+20-fold cross-validation. Report the test error obtained
+
+**Sol:**
+```{r}
+# alpha = 1 for LASSO
+set.seed(123)  
+lasso_cv <- cv.glmnet(train_x, train_y, alpha = 1, lambda = lambda_grid, nfolds = 20)
+
+# Best lambda
+best_lambda_lasso <- lasso_cv$lambda.min
+best_lambda_lasso
+
+lasso_pred <- predict(lasso_cv, s = best_lambda_lasso, newx = test_x)
+lasso_mse <- mean((lasso_pred - test_y)^2)
+lasso_rmse <- sqrt(lasso_mse)
+
+lasso_mse
+lasso_rmse
+```
+The optimal penalty parameter selected by 20-fold cross-validation is λ = 0.01, yielding a test MSE of approximately 1,499,849 and a corresponding RMSE of about 1224.68, indicating the average prediction error in the number of applications is around 1225.
+
+
+
+### (iv)
+Fit the ridge regression on the training set, with the penalization parameter chosen by
+leave-one-out cross-validation. Report the test error obtained.
+**Sol:**
+```{r}
+set.seed(123)
+
+ridge_cv <- cv.glmnet(train_x, train_y, alpha = 0, lambda = lambda_grid, 
+                      nfolds = nrow(train))
+
+# Best lambda
+best_lambda_ridge <- ridge_cv$lambda.min
+best_lambda_ridge
+
+ridge_pred <- predict(ridge_cv, s = best_lambda_ridge, newx = test_x)
+ridge_mse <- mean((ridge_pred - test_y)^2)
+ridge_rmse <- sqrt(ridge_mse)
+
+ridge_mse
+ridge_rmse
+```
+The optimal λ selected by leave-one-out cross-validation is 0.01, giving a test MSE of approximately 1,501,329 and an RMSE of about 1225.29. This test error is nearly identical to that of the LASSO model, suggesting that both methods achieve similar predictive performance on this dataset.
+
+### (v)
+which of the three models do you prefer? Is there much difference among the test errors?
+
+**Sol:**
+All three models: OLS, LASSO, and ridge regression have very similar test errors, with RMSE values all around 1225. This indicates that neither penalization method provides a meaningful improvement over ordinary least squares for predicting the number of applications. Since the predictive performance is nearly identical, the OLS model would be preferred for its simplicity and ease of interpretation, although LASSO could still be useful for variable selection if model sparsity is desired.
 
 
